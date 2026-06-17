@@ -190,13 +190,42 @@ def convert_content_list_to_str(
     return texts
 
 
-def get_str_from_messages(messages: List[AllMessageValues]) -> str:
+def get_tool_calls_str_from_message(message: AllMessageValues) -> str:
+    """
+    Serialize an assistant message's tool calls so the semantic cache key
+    distinguishes a follow-up request carrying tool results from the original
+    pre-tool-call request. Tool calls live outside ``content``.
+    """
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return ""
+    text = ""
+    for tool_call in tool_calls:
+        if not isinstance(tool_call, dict):
+            continue
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        if isinstance(name, str):
+            text += name
+        arguments = function.get("arguments")
+        if isinstance(arguments, str):
+            text += arguments
+    return text
+
+
+def get_str_from_messages(
+    messages: List[AllMessageValues], *, include_tool_calls: bool = False
+) -> str:
     """
     Converts a list of messages to a string
     """
     text = ""
     for message in messages:
         text += convert_content_list_to_str(message=message)
+        if include_tool_calls:
+            text += get_tool_calls_str_from_message(message)
     return text
 
 

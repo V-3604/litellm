@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,6 +12,8 @@ from litellm.litellm_core_utils.prompt_templates.common_utils import (
     add_system_prompt_to_messages,
     get_file_ids_from_messages,
     get_format_from_file_id,
+    get_str_from_messages,
+    get_tool_calls_str_from_message,
     handle_any_messages_to_chat_completion_str_messages_conversion,
     split_concatenated_json_objects,
     update_messages_with_model_file_ids,
@@ -721,3 +722,63 @@ class TestUnpackLegacyDefs:
         out = unpack_legacy_defs(schema)
         assert "components" not in out
         assert out["properties"]["r0"]["properties"]["p0"] == {"type": "string"}
+
+
+def _tool_call_conversation():
+    return [
+        {"role": "user", "content": "What is the weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "call_1", "content": "15C and sunny"},
+    ]
+
+
+def test_get_str_from_messages_excludes_tool_calls_by_default():
+    result = get_str_from_messages(_tool_call_conversation())
+
+    assert result == "What is the weather in Paris?15C and sunny"
+    assert "get_weather" not in result
+
+
+def test_get_str_from_messages_includes_tool_calls_when_requested():
+    conversation = _tool_call_conversation()
+
+    result = get_str_from_messages(conversation, include_tool_calls=True)
+
+    assert "get_weather" in result
+    assert '{"city": "Paris"}' in result
+    # The follow-up request carrying tool results must not collapse to the
+    # pre-tool-call request, otherwise the semantic cache returns a stale
+    # tool-call response and the agent re-issues the same call.
+    pre_tool_call = [{"role": "user", "content": "What is the weather in Paris?"}]
+    assert result != get_str_from_messages(pre_tool_call, include_tool_calls=True)
+
+
+def test_get_tool_calls_str_from_message_serializes_name_and_arguments():
+    message = _tool_call_conversation()[1]
+
+    assert get_tool_calls_str_from_message(message) == 'get_weather{"city": "Paris"}'
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "no tools here"},
+        {"role": "assistant", "content": None, "tool_calls": []},
+    ],
+)
+def test_get_tool_calls_str_from_message_empty_without_tool_calls(message):
+    assert get_tool_calls_str_from_message(message) == ""

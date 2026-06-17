@@ -264,7 +264,7 @@ class QdrantSemanticCache(BaseCache):
 
         # get the prompt
         messages = kwargs["messages"]
-        prompt = get_str_from_messages(messages)
+        prompt = get_str_from_messages(messages, include_tool_calls=True)
 
         # create an embedding for prompt
         embedding_response = cast(
@@ -307,7 +307,7 @@ class QdrantSemanticCache(BaseCache):
 
         # get the messages
         messages = kwargs["messages"]
-        prompt = get_str_from_messages(messages)
+        prompt = get_str_from_messages(messages, include_tool_calls=True)
 
         # convert to embedding
         embedding_response = cast(
@@ -387,7 +387,7 @@ class QdrantSemanticCache(BaseCache):
 
         # get the prompt
         messages = kwargs["messages"]
-        prompt = get_str_from_messages(messages)
+        prompt = get_str_from_messages(messages, include_tool_calls=True)
         embedding_response = await self._get_async_embedding(prompt, **kwargs)
 
         # get the embedding
@@ -422,7 +422,7 @@ class QdrantSemanticCache(BaseCache):
 
         # get the messages
         messages = kwargs["messages"]
-        prompt = get_str_from_messages(messages)
+        prompt = get_str_from_messages(messages, include_tool_calls=True)
 
         embedding_response = await self._get_async_embedding(prompt, **kwargs)
 

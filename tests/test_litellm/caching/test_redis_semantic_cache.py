@@ -988,3 +988,37 @@ def test_cache_get_cache_passes_responses_input_to_dynamic_cache():
         cached_result={"content": "Paris"},
         max_age=float("inf"),
     )
+
+
+def test_redis_semantic_cache_prompt_extraction_includes_tool_calls():
+    from litellm.caching.redis_semantic_cache import RedisSemanticCache
+
+    messages = [
+        {"role": "user", "content": "What is the weather in Paris?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": '{"city": "Paris"}',
+                    },
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "call_1", "content": "15C and sunny"},
+    ]
+
+    prompt = RedisSemanticCache._get_prompt_from_kwargs(messages=messages)
+
+    assert "get_weather" in prompt
+    assert '{"city": "Paris"}' in prompt
+    # The post-tool request must not collide with the pre-tool-call request,
+    # which is the false cache hit that made agents re-issue tool calls.
+    pre_tool_prompt = RedisSemanticCache._get_prompt_from_kwargs(
+        messages=[{"role": "user", "content": "What is the weather in Paris?"}]
+    )
+    assert prompt != pre_tool_prompt

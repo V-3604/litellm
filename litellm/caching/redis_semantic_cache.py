@@ -220,7 +220,7 @@ class RedisSemanticCache(BaseCache):
         """
         messages = kwargs.get("messages")
         if messages:
-            return get_str_from_messages(messages)
+            return get_str_from_messages(messages, include_tool_calls=True)
 
         if "input" not in kwargs:
             return None
